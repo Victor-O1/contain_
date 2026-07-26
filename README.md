@@ -1,4 +1,4 @@
-# Linux Virtualization & Container Management Platform (Node.js edition)
+# Linux Virtualization & Container Management Platform
 
 A browser-based platform for provisioning, accessing, and monitoring isolated Linux
 containers on demand — rebuilt on a **Node.js / Express** control plane (replacing
