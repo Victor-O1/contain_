@@ -1,0 +1,55 @@
+version: "3.9"
+
+services:
+  backend:
+    build: ./backend
+    container_name: platform-backend
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      - PORT=4000
+      - JWT_SECRET=${JWT_SECRET:-change_me_in_prod}
+      - DOCKER_SOCKET=/var/run/docker.sock
+      - DB_PATH=/data/platform.db
+      - BASE_DOMAIN=${BASE_DOMAIN:-sandboxes.local}
+      - PROXY_ENABLED=true
+    volumes:
+      # Control-plane needs access to the host's Docker Engine to manage sandbox containers.
+      - /var/run/docker.sock:/var/run/docker.sock
+      - backend_data:/data
+      - proxy_conf:/app/data/proxy-conf.d
+    networks:
+      - platform_sandbox_net
+
+  frontend:
+    build: ./frontend
+    container_name: platform-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    networks:
+      - platform_sandbox_net
+
+  # Fronts every launched sandbox: routes <subdomain>.<BASE_DOMAIN> -> the sandbox's mapped port.
+  # backend writes vhost files into proxy_conf; this container reloads nginx to pick them up.
+  nginx-proxy:
+    image: nginx:alpine
+    container_name: platform-proxy
+    restart: unless-stopped
+    network_mode: host      # needs host networking to reach dynamically published sandbox ports
+    volumes:
+      - ./infra/nginx.conf:/etc/nginx/nginx.conf:ro
+      - proxy_conf:/etc/nginx/conf.d/sandboxes:ro
+    depends_on:
+      - backend
+
+volumes:
+  backend_data:
+  proxy_conf:
+
+networks:
+  platform_sandbox_net:
+    external: true   # created automatically by the backend on first run (ensureNetwork)
